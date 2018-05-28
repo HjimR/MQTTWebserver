@@ -2,14 +2,22 @@
 #include <PubSubClient.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
+//
+//const char* ssid = "Tesla IoT";
+//const char* password = "fsL6HgjN";
 
-const char* ssid = "Tesla IoT";
-const char* password = "fsL6HgjN";
+const char* ssid = "ZyXEL NBG-418N v2";
+const char* password = "XJKUN47796";
 
 const char* mqttServer = "m13.cloudmqtt.com";
 const int mqttPort = 16110;
 const char* mqttUser = "umoogjgo";
 const char* mqttPassword = "OamdgsvzmmOu";
+
+bool ldrBool = false;
+int analogValue = 0;
+int sensorMin = 1023;        // minimum sensor value
+int sensorMax = 0;           // maximum sensor value
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -23,9 +31,14 @@ const char MAIN_page[] PROGMEM = R"=====(
 <html>
 <body>
 <center>
-<h1>WiFi LED on off demo: 1</h1><br>
-Ciclk to turn <a href="ledOff">LED ON</a><br>
-Ciclk to turn <a href="ledOn">LED OFF</a><br>
+<h1>WiFi LED on off Buttons </h1><br> //led ON & OFF buttons html
+Click to turn <a href="ledOff">LED OFF</a><br>
+Click to turn <a href="ledOn">LED ON</a><br>
+<hr>
+
+<h2>LDR  on off Buttons </h2><br>  //LDR ON & OFF buttons html
+Click to turn <a href="ldrOff">LDR OFF</a><br>
+Click to turn <a href="ldrOn">LDR ON</a><br>
 <hr>
 </center>
 
@@ -34,14 +47,14 @@ Ciclk to turn <a href="ledOn">LED OFF</a><br>
 )=====";
 //---------------------------------------------------------------
 //On board LED Connected to GPIO2
-#define LED 2  
+#define LED 2  //D4 --> LED/relay/lamp
+#define LDRPin A0 // analoog pin A0 LDR
 
 //Declare a global object variable from the ESP8266WebServer class.
 ESP8266WebServer server(80); //Server on port 80
 
-//===============================================================
 // This routine is executed when you open its IP in browser
-//===============================================================
+
 void handleRoot() {
  Serial.println("You called root page");
  String s = MAIN_page; //Read HTML contents
@@ -51,15 +64,26 @@ void handleRoot() {
 void handleLEDon() { 
  Serial.println("LED on page");
  digitalWrite(LED,HIGH); //LED is connected in reverse
- server.send(200, "text/html", "LED is ON"); //Send ADC value only to client ajax request
+ server.send(200, "text/html", "LED is ON"); 
 }
 
 void handleLEDoff() { 
  Serial.println("LED off page");
  digitalWrite(LED,LOW); //LED off
- server.send(200, "text/html", "LED is OFF"); //Send ADC value only to client ajax request
+ server.send(200, "text/html", "LED is OFF"); 
 }
 
+void handleLDRon(){
+ Serial.println("LDR on page");
+ bool ldrBool = true;
+ server.send(200, "text/html", "LDR is ON"); 
+}
+
+void handleLDRoff(){
+ Serial.println("LDR on page");
+ bool ldrBool = false;
+ server.send(200, "text/html", "LDR is OFF"); 
+}
 
 void callback(char* topic, byte* payload, unsigned int length) {
   String a;
@@ -79,14 +103,33 @@ void callback(char* topic, byte* payload, unsigned int length) {
   if( a == "ledOff"){
     handleLEDoff();
     Serial.println(2);
+    }
+   if(a == "ldrOn"){   
+    Serial.println ("LDR is nu in gebruik");
+    ldrBool = true;
+   }
+  if( a == "ldrOff"){
+    Serial.println ("LDR is niet in gebruik");
+    ldrBool = false;
+    }
   }
-  }
-  
-
- 
   Serial.println();
   Serial.println("-----------------------");
- 
+ }
+
+ void loopDaLDR(){
+  analogValue = analogRead(LDRPin); // waarde uitlezen van LDR en die vervolgens gelijk stellen aan analogvalue. analogvalue heeft nu de waarde van ldr
+  analogValue = map(analogValue, sensorMin, sensorMax, 0, 255);
+  analogValue = constrain(analogValue, 0, 255);
+  Serial.println("LDR active");
+  Serial.println(analogValue);
+  delay(500);
+  if (analogValue >= 150){
+    digitalWrite(LED,HIGH);
+  }
+  else if (analogValue <= 75){
+    digitalWrite(LED,LOW);
+    }
 }
 
 void setup() {
@@ -150,7 +193,7 @@ void setup() {
   client.publish("esp/test", "Hello from ESP8266");
   client.subscribe("esp/test");
   client.subscribe("esp/connected");
-  client.subscribe("145.24.238.62");
+//  client.subscribe("145.24.238.62");
  
 }
  
@@ -159,4 +202,7 @@ void setup() {
 void loop() {
   client.loop();
    server.handleClient();          //Handle client requests
+   if (ldrBool == true){
+    loopDaLDR();
+    }
 }
